@@ -3,6 +3,7 @@
 import { Canvas } from '@react-three/fiber';
 import DenseSphere from './components/DenseSphere';
 import HamburgerMenu from './components/HamburgerMenu';
+import AudioPlayer from './components/AudioPlayer';
 
 export default function Home() {
   return (
@@ -28,6 +29,9 @@ export default function Home() {
 
       {/* HAMBURGER MENU */}
       <HamburgerMenu />
+
+      {/* AUDIO PLAYER */}
+      <AudioPlayer />
     </main>
   );
 }

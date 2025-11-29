@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 export default function HamburgerMenu() {
   const [open, setOpen] = useState(false);
 
-  const menuItems = [
+  const menuItems: { label: string; href: string }[] = [
     // { label: 'Home', href: '#' },
     // { label: 'About', href: '#' },
     // { label: 'Services', href: '#' },
