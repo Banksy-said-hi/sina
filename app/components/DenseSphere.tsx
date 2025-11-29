@@ -15,9 +15,9 @@ export default function DenseSphere() {
 
   // --- CONFIGURATION ---
   // We scale down p5 units to Three.js units (approx /100)
-  const boxSize = 0.2; 
+  const boxSize = 0.3; 
   const spacing = 0.5; 
-  const radius = 3;    
+  const radius = 5;    
   
   // --- 1. CALCULATE POSITIONS (Runs once) ---
   const particles = useMemo(() => {
@@ -62,11 +62,11 @@ export default function DenseSphere() {
   useLayoutEffect(() => {
     // Make near plane small so camera can enter the sphere without clipping
     if (camera) {
-      camera.near = 0.01;
+      camera.near = 0.001;
       camera.updateProjectionMatrix();
-      // If the camera is still at origin, move it out along z so zoom starts outside
+      // Start camera close to/inside the object so user scrolls back to see the whole thing
       if (camera.position.length() === 0) {
-        camera.position.set(0, 0, 10);
+        camera.position.set(0, 0, 0.1);
       }
     }
   }, [camera]);
@@ -127,7 +127,7 @@ export default function DenseSphere() {
           <meshPhongMaterial 
             color="#ff3232" 
             specular="#ffffff" 
-            shininess={10} 
+            shininess={50} 
           />
         </instancedMesh>
       </group>
