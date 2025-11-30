@@ -58,7 +58,34 @@ export default function DenseSphere() {
     meshRef.current.instanceMatrix.needsUpdate = true;
   }, [particles]);
 
-  // --- 2.5 CAMERA CONFIG (Runs once) ---
+  // --- 2.3 LOAD TEXTURE ---
+  const textureLoader = useMemo(() => new THREE.TextureLoader(), []);
+  
+  const materials = useMemo(() => {
+    const textureUrl = '/image.png';
+    const texture = textureLoader.load(textureUrl);
+    
+    // Red material for non-textured faces
+    const redMaterial = new THREE.MeshPhongMaterial({
+      color: '#ff3232',
+      specular: '#ffffff',
+      shininess: 50,
+    });
+    
+    // Material with texture for front face
+    const textureMaterial = new THREE.MeshPhongMaterial({
+      map: texture,
+      specular: '#ffffff',
+      shininess: 50,
+    });
+    
+    return [textureMaterial, redMaterial, redMaterial, redMaterial, redMaterial, redMaterial];
+  }, [textureLoader]);
+
+  // --- 2.4 STORE ORIGINAL PARTICLE POSITIONS ---
+  const originalPositions = useMemo(() => {
+    return particles.map(p => new THREE.Vector3(p.x, p.y, p.z));
+  }, [particles]);
   useLayoutEffect(() => {
     // Make near plane small so camera can enter the sphere without clipping
     if (camera) {
@@ -99,16 +126,35 @@ export default function DenseSphere() {
   useFrame((state) => {
     const time = state.clock.getElapsedTime();
     
+    if (meshRef.current && originalPositions.length > 0) {
+      const tempObject = new THREE.Object3D();
+      const tempDir = new THREE.Vector3();
+
+      // Breathing oscillation: 0 to 1 cycle (0 = normal, 1 = expanded, 0 = back to normal)
+      const breathe = (Math.sin(time * 1.2) + 1) / 2; // Ranges from 0 to 1
+      const expandAmount = breathe * 6; // Expand up to 6 units outward
+
+      originalPositions.forEach((originalPos, i) => {
+        // Get direction from center
+        tempDir.copy(originalPos).normalize();
+        
+        // Create new position: move along direction by expand amount
+        const newPos = originalPos.clone().addScaledVector(tempDir, expandAmount);
+        
+        tempObject.position.copy(newPos);
+        tempObject.updateMatrix();
+        meshRef.current!.setMatrixAt(i, tempObject.matrix);
+      });
+
+      meshRef.current.instanceMatrix.needsUpdate = true;
+    }
+
     if (groupRef.current) {
       // Rotation logic (slower)
       const angle = time * 0.06;
       groupRef.current.rotation.x = angle;
       groupRef.current.rotation.y = angle;
       groupRef.current.rotation.z = angle;
-
-      // Oscillation logic (reduced amplitude and slower frequency)
-      const oscillation = Math.sin(time * 0.6) * 0.6;
-      groupRef.current.position.set(oscillation, oscillation, oscillation);
     }
   });
 
@@ -122,13 +168,8 @@ export default function DenseSphere() {
       <pointLight position={[5, -5, 6]} intensity={50} distance={20} decay={2} color="#c8c8ff" />
 
       <group ref={groupRef}>
-        <instancedMesh ref={meshRef} args={[undefined, undefined, particles.length]}>
+        <instancedMesh ref={meshRef} args={[undefined, materials, particles.length]}>
           <boxGeometry args={[boxSize, boxSize, boxSize]} />
-          <meshPhongMaterial 
-            color="#ff3232" 
-            specular="#ffffff" 
-            shininess={50} 
-          />
         </instancedMesh>
       </group>
     </>
