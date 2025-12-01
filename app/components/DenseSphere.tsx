@@ -2,8 +2,20 @@
 
 import { useRef, useMemo, useLayoutEffect, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+
+function AngelModel() {
+  const gltf = useGLTF('/angel.glb'); // Make sure to place your angel.glb in /public folder
+  
+  return (
+    <primitive
+      object={gltf.scene}
+      position={[0, -2, 0]} // Adjusted Y to center the head
+      scale={[0.1, 0.1, 0.1]} // One tenth in size
+    />
+  );
+}
 
 export default function DenseSphere() {
   const meshRef = useRef<THREE.InstancedMesh>(null);
@@ -62,24 +74,26 @@ export default function DenseSphere() {
   const textureLoader = useMemo(() => new THREE.TextureLoader(), []);
   
   const materials = useMemo(() => {
-    const textureUrl = '/image.png';
-    const texture = textureLoader.load(textureUrl);
+    const brickTextureUrl = '/brick.jpg';
+    const brickTexture = textureLoader.load(brickTextureUrl);
+    const imageTextureUrl = '/image.png';
+    const imageTexture = textureLoader.load(imageTextureUrl);
     
-    // Red material for non-textured faces
-    const redMaterial = new THREE.MeshPhongMaterial({
-      color: '#ff3232',
-      specular: '#ffffff',
-      shininess: 50,
+    // Brick material for 5 faces
+    const brickMaterial = new THREE.MeshPhongMaterial({
+      map: brickTexture,
+      specular: '#1d1919ff',
+      shininess: 1,
     });
     
-    // Material with texture for front face
-    const textureMaterial = new THREE.MeshPhongMaterial({
-      map: texture,
+    // Image material for 1 front face
+    const imageMaterial = new THREE.MeshPhongMaterial({
+      map: imageTexture,
       specular: '#ffffff',
-      shininess: 50,
+      shininess: 90,
     });
     
-    return [textureMaterial, redMaterial, redMaterial, redMaterial, redMaterial, redMaterial];
+    return [imageMaterial, brickMaterial, brickMaterial, brickMaterial, brickMaterial, brickMaterial];
   }, [textureLoader]);
 
   // --- 2.4 STORE ORIGINAL PARTICLE POSITIONS ---
@@ -166,6 +180,11 @@ export default function DenseSphere() {
       <ambientLight intensity={0.2} />
       <directionalLight position={[1, 1, -1]} intensity={1} />
       <pointLight position={[5, -5, 6]} intensity={50} distance={20} decay={2} color="#c8c8ff" />
+      {/* Light from top of angel's head */}
+      <pointLight position={[0, 2, 0]} intensity={90} distance={15} decay={2} color="#ff0000" />
+
+      {/* Angel model at center */}
+      <AngelModel />
 
       <group ref={groupRef}>
         <instancedMesh ref={meshRef} args={[undefined, materials, particles.length]}>
