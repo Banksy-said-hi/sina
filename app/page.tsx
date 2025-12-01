@@ -28,7 +28,7 @@ export default function Home() {
       </div> */}
 
       {/* HAMBURGER MENU */}
-      <HamburgerMenu />
+      {/* <HamburgerMenu /> */}
 
       {/* AUDIO PLAYER */}
       <AudioPlayer />
