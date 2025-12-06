@@ -6,7 +6,7 @@ export interface DialogueContextType {
   currentDialogueIndex: number;
   isListeningForKeystrokes: boolean;
   inputBuffer: string;
-  setInputBuffer: (buffer: string) => void;
+  setInputBuffer: (buffer: string | ((prev: string) => string)) => void;
   hasSubmittedName: boolean;
   userName: string;
   submitName: (name: string) => void;

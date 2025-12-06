@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
 
 /**
  * Google Analytics Component
@@ -10,9 +9,6 @@ import { usePathname, useSearchParams } from 'next/navigation';
  * Requires NEXT_PUBLIC_GA_ID environment variable set in .env.local
  */
 export function GoogleAnalytics() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
   useEffect(() => {
     // Only run if GA_ID is configured
     if (!process.env.NEXT_PUBLIC_GA_ID) {
@@ -30,7 +26,7 @@ export function GoogleAnalytics() {
     // Initialize gtag
     gtag('js', new Date());
     gtag('config', process.env.NEXT_PUBLIC_GA_ID, {
-      page_path: pathname + (searchParams ? `?${searchParams.toString()}` : ''),
+      page_path: window.location.pathname,
       send_page_view: true,
       allow_google_signals: true,
       allow_ad_personalization_signals: false,
@@ -43,7 +39,7 @@ export function GoogleAnalytics() {
     script.onload = () => {
       // Script loaded successfully
       (window as any).gtag('event', 'page_view', {
-        page_path: pathname,
+        page_path: window.location.pathname,
       });
     };
     document.head.appendChild(script);
@@ -51,7 +47,7 @@ export function GoogleAnalytics() {
     return () => {
       // Script is global and persistent across pages (which is desired for GA)
     };
-  }, [pathname, searchParams]);
+  }, []);
 
   return null;
 }

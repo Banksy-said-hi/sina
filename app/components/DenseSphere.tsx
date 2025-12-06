@@ -16,7 +16,7 @@ function AngelModel({ opacity = 1 }: { opacity?: number }) {
       object={gltf.scene}
       position={[0, -1.8, 0]} // Adjusted Y to center the head, moved 10% upwards
       scale={[0.1, 0.1, 0.1]} // One tenth in size
-      onUpdate={(obj) => {
+      onUpdate={(obj: any) => {
         // Recursively update opacity of all materials in the angel model
         obj.traverse((child: any) => {
           if (child.material) {
