@@ -6,6 +6,7 @@ import { OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { useDialogue } from '../context/DialogueContext';
 import EdgesSphere from './EdgesSphere';
+import { analyticsEvents } from '@/app/lib/analyticsEvents';
 
 function AngelModel({ opacity = 1 }: { opacity?: number }) {
   const gltf = useGLTF('/angel.glb'); // Make sure to place your angel.glb in /public folder
@@ -43,7 +44,7 @@ export default function DenseSphere() {
   const [scatterProgress, setScatterProgress] = useState(0);
   const [lightColorIndex, setLightColorIndex] = useState(0);
   const scatterStartTimeRef = useRef<number | null>(null);
-  const { advanceDialogue, hasSubmittedName, setScatterComplete } = useDialogue();
+  const { advanceDialogue, currentDialogueIndex, hasSubmittedName, setScatterComplete } = useDialogue();
   const { camera, gl } = useThree() as {
     camera: THREE.PerspectiveCamera;
     gl: THREE.WebGLRenderer;
@@ -193,13 +194,15 @@ export default function DenseSphere() {
           if (edgesSphereRef.current?.triggerShine) {
             edgesSphereRef.current.triggerShine();
           }
+          // Track analytics
+          analyticsEvents.sphereClicked(currentDialogueIndex + 1);
         }
       }
     };
 
     el.addEventListener('mousedown', onMouseDown);
     return () => el.removeEventListener('mousedown', onMouseDown);
-  }, [gl, camera, advanceDialogue]);
+  }, [gl, camera, advanceDialogue, currentDialogueIndex]);
 
   // --- 2.8 SCATTER ANIMATION: Trigger when name is submitted ---
   useEffect(() => {
@@ -222,6 +225,8 @@ export default function DenseSphere() {
       if (progress >= 1) {
         clearInterval(interval);
         setScatterComplete(true); // Trigger reward display
+        // Track analytics
+        analyticsEvents.scatterAnimationCompleted();
       }
     }, 16); // ~60fps
 

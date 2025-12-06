@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useRef, useCallback, useState, useEffect } from 'react';
 import { DialogueContextType, MAX_NAME_LENGTH, VALID_NAME_PATTERN, KEYBOARD_INPUT_THROTTLE_MS } from '@/app/types';
+import { analyticsEvents } from '@/app/lib/analyticsEvents';
 
 /**
  * Sanitize and validate user input
@@ -44,6 +45,8 @@ export function DialogueProvider({ children }: { children: React.ReactNode }) {
     if (sanitizedName.length > 0) {
       setUserName(sanitizedName);
       setHasSubmittedName(true);
+      // Track analytics
+      analyticsEvents.nameSubmitted(sanitizedName.length);
     }
   }, []);
 

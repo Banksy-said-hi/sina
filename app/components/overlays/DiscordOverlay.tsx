@@ -1,9 +1,11 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useDialogue } from '@/app/context/DialogueContext';
 import Overlay from '@/app/components/ui/Overlay';
 import { DISCORD_INVITE_URL } from '@/app/types';
 import { validateExternalUrl } from '@/app/lib/security';
+import { analyticsEvents } from '@/app/lib/analyticsEvents';
 
 export default function DiscordOverlay() {
   const { scatterComplete } = useDialogue();
@@ -11,8 +13,16 @@ export default function DiscordOverlay() {
   const isVisible = scatterComplete;
   const isValidUrl = validateExternalUrl(DISCORD_INVITE_URL);
 
+  // Track when overlay becomes visible
+  useEffect(() => {
+    if (isVisible) {
+      analyticsEvents.discordInvitationViewed();
+    }
+  }, [isVisible]);
+
   const handleDiscordClick = () => {
     if (isValidUrl) {
+      analyticsEvents.discordLinkClicked();
       window.open(DISCORD_INVITE_URL, '_blank', 'noopener,noreferrer');
     }
   };

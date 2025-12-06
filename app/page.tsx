@@ -10,11 +10,13 @@ import ProgressIndicator from './components/ProgressIndicator';
 import InputPromptOverlay from './components/overlays/InputPromptOverlay';
 import WelcomeOverlay from './components/overlays/WelcomeOverlay';
 import DiscordOverlay from './components/overlays/DiscordOverlay';
+import { GoogleAnalytics } from './lib/analytics';
 import { ANIMATIONS } from './constants/animations';
 
 export default function Home() {
   return (
     <ErrorBoundary>
+      <GoogleAnalytics />
       <DialogueProvider>
         <KeystrokeListener />
         <style>{ANIMATIONS.fadeInScale}</style>
