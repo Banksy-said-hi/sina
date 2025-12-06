@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { logger } from '@/app/lib/logger';
 
 export default function AudioPlayer() {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -10,7 +11,7 @@ export default function AudioPlayer() {
     const startAudio = () => {
       if (hasStartedRef.current) return;
       if (!audioRef.current) {
-        console.log('Audio ref not available yet');
+        logger.log('Audio ref not available yet');
         return;
       }
       
@@ -21,10 +22,10 @@ export default function AudioPlayer() {
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log('✓ Music started playing');
+            logger.log('Music started playing');
           })
           .catch((err) => {
-            console.error('✗ Error playing audio:', err);
+            logger.error('Error playing audio:', err);
             hasStartedRef.current = false; // Reset to try again
           });
       }
@@ -35,7 +36,7 @@ export default function AudioPlayer() {
     document.addEventListener('touchstart', startAudio);
     document.addEventListener('keydown', startAudio);
     
-    console.log('Audio player mounted, waiting for user interaction...');
+    logger.log('Audio player mounted, waiting for user interaction...');
 
     return () => {
       document.removeEventListener('click', startAudio);

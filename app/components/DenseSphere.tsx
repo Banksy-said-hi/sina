@@ -1,18 +1,29 @@
 'use client';
 
-import { useRef, useMemo, useLayoutEffect, useEffect } from 'react';
+import { useRef, useMemo, useLayoutEffect, useEffect, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { useDialogue } from '../context/DialogueContext';
+import EdgesSphere from './EdgesSphere';
 
-function AngelModel() {
+function AngelModel({ opacity = 1 }: { opacity?: number }) {
   const gltf = useGLTF('/angel.glb'); // Make sure to place your angel.glb in /public folder
   
   return (
     <primitive
       object={gltf.scene}
-      position={[0, -2, 0]} // Adjusted Y to center the head
+      position={[0, -1.8, 0]} // Adjusted Y to center the head, moved 10% upwards
       scale={[0.1, 0.1, 0.1]} // One tenth in size
+      onUpdate={(obj) => {
+        // Recursively update opacity of all materials in the angel model
+        obj.traverse((child: any) => {
+          if (child.material) {
+            child.material.opacity = opacity;
+            child.material.transparent = true;
+          }
+        });
+      }}
     />
   );
 }
@@ -20,6 +31,19 @@ function AngelModel() {
 export default function DenseSphere() {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const groupRef = useRef<THREE.Group>(null);
+  const hitBoxRef = useRef<THREE.Mesh>(null);
+  const ambientLightRef = useRef<THREE.Light>(null);
+  const directionalLightRef = useRef<THREE.Light>(null);
+  const pointLight1Ref = useRef<THREE.Light>(null);
+  const pointLight2Ref = useRef<THREE.Light>(null);
+  const edgesSphereRef = useRef<{ triggerShine: () => void } | null>(null);
+  const raycasterRef = useRef(new THREE.Raycaster());
+  const mouseRef = useRef(new THREE.Vector2());
+  const lastClickTimeRef = useRef(0);
+  const [scatterProgress, setScatterProgress] = useState(0);
+  const [lightColorIndex, setLightColorIndex] = useState(0);
+  const scatterStartTimeRef = useRef<number | null>(null);
+  const { advanceDialogue, hasSubmittedName, setScatterComplete } = useDialogue();
   const { camera, gl } = useThree() as {
     camera: THREE.PerspectiveCamera;
     gl: THREE.WebGLRenderer;
@@ -29,7 +53,11 @@ export default function DenseSphere() {
   // We scale down p5 units to Three.js units (approx /100)
   const boxSize = 0.3; 
   const spacing = 0.5; 
-  const radius = 5;    
+  const radius = 5;
+  
+  // Light color palette - cycles with each click
+  const lightColors = ['#c8c8ff', '#ff1493', '#00ff00', '#ffaa00', '#00ffff', '#ff0000'];
+  const currentLightColor = lightColors[lightColorIndex % lightColors.length];    
   
   // --- 1. CALCULATE POSITIONS (Runs once) ---
   const particles = useMemo(() => {
@@ -136,7 +164,69 @@ export default function DenseSphere() {
     return () => el.removeEventListener('wheel', onWheel);
   }, [gl, camera]);
 
-  // --- 3. ANIMATION LOOP (Runs every frame) ---
+  // --- 2.7 CLICK HANDLER: Raycast to hit box ---
+  useEffect(() => {
+    if (!gl || !camera) return;
+
+    const el = gl.domElement;
+
+    const onMouseDown = (event: MouseEvent) => {
+      // Debounce: prevent multiple clicks within 300ms
+      const now = Date.now();
+      if (now - lastClickTimeRef.current < 300) return;
+      lastClickTimeRef.current = now;
+
+      // Get normalized device coordinates
+      const rect = el.getBoundingClientRect();
+      mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      // Raycast
+      raycasterRef.current.setFromCamera(mouseRef.current, camera);
+      if (hitBoxRef.current) {
+        const intersects = raycasterRef.current.intersectObject(hitBoxRef.current);
+        if (intersects.length > 0) {
+          advanceDialogue();
+          // Cycle to next light color
+          setLightColorIndex((prev) => prev + 1);
+          // Trigger shine effect on EdgesSphere
+          if (edgesSphereRef.current?.triggerShine) {
+            edgesSphereRef.current.triggerShine();
+          }
+        }
+      }
+    };
+
+    el.addEventListener('mousedown', onMouseDown);
+    return () => el.removeEventListener('mousedown', onMouseDown);
+  }, [gl, camera, advanceDialogue]);
+
+  // --- 2.8 SCATTER ANIMATION: Trigger when name is submitted ---
+  useEffect(() => {
+    if (hasSubmittedName && scatterStartTimeRef.current === null) {
+      scatterStartTimeRef.current = Date.now();
+    }
+  }, [hasSubmittedName]);
+
+  // --- 2.9 UPDATE SCATTER PROGRESS ---
+  useEffect(() => {
+    if (!hasSubmittedName) return;
+
+    const animationDuration = 5000; // 5 seconds (80% faster than original 25s)
+    const interval = setInterval(() => {
+      if (!scatterStartTimeRef.current) return;
+      const elapsed = Date.now() - scatterStartTimeRef.current;
+      const progress = Math.min(elapsed / animationDuration, 1);
+      setScatterProgress(progress);
+
+      if (progress >= 1) {
+        clearInterval(interval);
+        setScatterComplete(true); // Trigger reward display
+      }
+    }, 16); // ~60fps
+
+    return () => clearInterval(interval);
+  }, [hasSubmittedName, setScatterComplete]);
   useFrame((state) => {
     const time = state.clock.getElapsedTime();
     
@@ -144,16 +234,30 @@ export default function DenseSphere() {
       const tempObject = new THREE.Object3D();
       const tempDir = new THREE.Vector3();
 
-      // Breathing oscillation: 0 to 1 cycle (0 = normal, 1 = expanded, 0 = back to normal)
-      const breathe = (Math.sin(time * 1.2) + 1) / 2; // Ranges from 0 to 1
-      const expandAmount = breathe * 6; // Expand up to 6 units outward
+      // Smooth step easing for scatter (cubic ease-out)
+      const easedScatter = scatterProgress < 1 
+        ? 1 - Math.pow(1 - scatterProgress, 3) 
+        : 1;
+
+      // Breathing oscillation: only apply if not scattering
+      const breathe = scatterProgress < 1 
+        ? (Math.sin(time * 1.2) + 1) / 2 
+        : 0;
+      const expandAmount = breathe * 6;
 
       originalPositions.forEach((originalPos, i) => {
-        // Get direction from center
         tempDir.copy(originalPos).normalize();
         
-        // Create new position: move along direction by expand amount
-        const newPos = originalPos.clone().addScaledVector(tempDir, expandAmount);
+        let newPos: THREE.Vector3;
+        
+        if (scatterProgress > 0) {
+          // Scatter phase: move particles outward rapidly
+          const scatterDistance = 50 * easedScatter; // Particles fly up to 50 units away
+          newPos = originalPos.clone().addScaledVector(tempDir, scatterDistance);
+        } else {
+          // Normal breathing phase
+          newPos = originalPos.clone().addScaledVector(tempDir, expandAmount);
+        }
         
         tempObject.position.copy(newPos);
         tempObject.updateMatrix();
@@ -161,14 +265,40 @@ export default function DenseSphere() {
       });
 
       meshRef.current.instanceMatrix.needsUpdate = true;
+
+      // Fade out particle opacity during scatter
+      if (meshRef.current.material) {
+        const materials = meshRef.current.material as THREE.Material[];
+        materials.forEach((material: any) => {
+          material.opacity = Math.max(0, 1 - scatterProgress * 1.5);
+          material.transparent = true;
+          material.needsUpdate = true;
+        });
+      }
+    }
+
+    // Fade out lights during scatter
+    if (ambientLightRef.current) {
+      (ambientLightRef.current as any).intensity = 0.2 * (1 - scatterProgress);
+    }
+    if (directionalLightRef.current) {
+      (directionalLightRef.current as any).intensity = 1 * (1 - scatterProgress);
+    }
+    if (pointLight1Ref.current) {
+      (pointLight1Ref.current as any).intensity = 50 * (1 - scatterProgress);
+    }
+    if (pointLight2Ref.current) {
+      (pointLight2Ref.current as any).intensity = 90 * (1 - scatterProgress);
     }
 
     if (groupRef.current) {
       // Rotation logic (slower)
-      const angle = time * 0.06;
-      groupRef.current.rotation.x = angle;
-      groupRef.current.rotation.y = angle;
-      groupRef.current.rotation.z = angle;
+      if (scatterProgress < 1) {
+        const angle = time * 0.06;
+        groupRef.current.rotation.x = angle;
+        groupRef.current.rotation.y = angle;
+        groupRef.current.rotation.z = angle;
+      }
     }
   });
 
@@ -177,14 +307,35 @@ export default function DenseSphere() {
       <OrbitControls enableZoom={false} />
       
       {/* Lights matching your p5 sketch */}
-      <ambientLight intensity={0.2} />
-      <directionalLight position={[1, 1, -1]} intensity={1} />
-      <pointLight position={[5, -5, 6]} intensity={50} distance={20} decay={2} color="#c8c8ff" />
+      <ambientLight ref={ambientLightRef} intensity={0.2} />
+      <directionalLight ref={directionalLightRef} position={[1, 1, -1]} intensity={1} />
+      <pointLight ref={pointLight1Ref} position={[5, -5, 6]} intensity={80} distance={25} decay={2} color={currentLightColor} />
       {/* Light from top of angel's head */}
-      <pointLight position={[0, 2, 0]} intensity={90} distance={15} decay={2} color="#ff0000" />
+      <pointLight ref={pointLight2Ref} position={[0, 2, 0]} intensity={120} distance={20} decay={2} color={currentLightColor} />
 
       {/* Angel model at center */}
-      <AngelModel />
+      <AngelModel opacity={Math.max(0, 1 - scatterProgress * 1.5)} />
+
+      {/* Invisible hit box for dialogue interaction */}
+      <mesh 
+        ref={hitBoxRef}
+        position={[0, -1.8, 0]}
+      >
+        <sphereGeometry args={[1.5, 32, 32]} />
+        <meshPhongMaterial 
+          transparent 
+          opacity={0}
+          wireframe={false}
+        />
+      </mesh>
+
+      {/* Glowing border sphere */}
+      <EdgesSphere 
+        ref={edgesSphereRef as any}
+        position={[0, -1.8, 0]} 
+        radius={1.5} 
+        scatterProgress={scatterProgress} 
+      />
 
       <group ref={groupRef}>
         <instancedMesh ref={meshRef} args={[undefined, materials, particles.length]}>

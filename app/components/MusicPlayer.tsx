@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { logger } from '@/app/lib/logger';
 
 export default function MusicPlayer() {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -36,7 +37,7 @@ export default function MusicPlayer() {
           return;
         }
       } catch (error) {
-        console.log('Autoplay with sound failed, trying muted:', error);
+        logger.log('Autoplay with sound failed, trying muted:', error);
         
         // Fallback: play muted, then unmute
         try {
@@ -50,7 +51,7 @@ export default function MusicPlayer() {
             }
           }, 100);
         } catch (mutedError) {
-          console.log('Muted autoplay also failed:', mutedError);
+          logger.log('Muted autoplay also failed:', mutedError);
         }
       }
     };
